@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { dayNames } from "../constants";
-import { trimTime } from "../lib/dictionary";
+import { useEffect, useState } from "react";
+import { ConstraintSlotGrid } from "../components/constraints/ConstraintSlotGrid";
+import { constraintConfig, preferenceOrder } from "../lib/constraints";
 import type { Catalog, ConstraintKey, RowData, TimeSlot } from "../types";
 
 type ConstraintHandlers = {
@@ -15,22 +15,6 @@ type ConstraintsSectionProps = ConstraintHandlers & {
   disabled: boolean;
 };
 
-type ConstraintMode = "unavailability" | "preference";
-
-type ConstraintViewConfig = {
-  title: string;
-  entityLabel: string;
-  entityIdKey: string;
-  entityNameKey: string;
-  resource: string;
-  recordIdKey: string;
-  mode: ConstraintMode;
-  entities: RowData[];
-  records: RowData[];
-};
-
-const preferenceOrder = ["", "preferred", "undesired"] as const;
-
 export function ConstraintsSection({
   activeConstraint,
   catalog,
@@ -40,7 +24,7 @@ export function ConstraintsSection({
   onDelete,
 }: ConstraintsSectionProps) {
   const config = constraintConfig(activeConstraint, catalog);
-  const [selectedEntityId, setSelectedEntityId] = useState<string>("");
+  const [selectedEntityId, setSelectedEntityId] = useState("");
 
   useEffect(() => {
     setSelectedEntityId((current) => (
@@ -51,18 +35,10 @@ export function ConstraintsSection({
   }, [activeConstraint, config.entityIdKey, config.entities]);
 
   const selectedEntity = config.entities.find((entity) => String(entity[config.entityIdKey]) === selectedEntityId);
-  const slotsByDay = useMemo(() => groupSlotsByDay(catalog.timeSlots), [catalog.timeSlots]);
-  const pairNumbers = useMemo(() => uniquePairNumbers(catalog.timeSlots), [catalog.timeSlots]);
-  const dayNumbers = useMemo(() => Object.keys(slotsByDay).map(Number).sort((left, right) => left - right), [slotsByDay]);
-  const recordsBySlot = useMemo(
-    () => mapRecordsBySlot(config.records, config.entityIdKey, selectedEntityId),
-    [config.records, config.entityIdKey, selectedEntityId],
-  );
 
-  function toggleSlot(slot: TimeSlot) {
+  function toggleSlot(slot: TimeSlot, current?: RowData) {
     if (!selectedEntity || disabled) return;
 
-    const current = recordsBySlot.get(String(slot.time_slot_id));
     if (config.mode === "unavailability") {
       if (current) {
         onDelete(config.resource, [Number(current[config.recordIdKey])]);
@@ -127,132 +103,14 @@ export function ConstraintsSection({
         </label>
       </section>
 
-      <section className="constraint-table-wrap">
-        <table className="constraint-slot-table">
-          <thead>
-            <tr>
-              <th>Слот</th>
-              {dayNumbers.map((day) => (
-                <th key={day}>{dayNames[day]}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {pairNumbers.map((pairNumber) => {
-              const sampleSlot = catalog.timeSlots.find((item) => item.pair_number === pairNumber);
-              return (
-              <tr key={pairNumber}>
-                <th>
-                  <strong>{pairNumber}</strong>
-                  {sampleSlot && <span>{trimTime(sampleSlot.starts_at)}-{trimTime(sampleSlot.ends_at)}</span>}
-                </th>
-                {dayNumbers.map((day) => {
-                  const slot = slotsByDay[day]?.find((item) => item.pair_number === pairNumber);
-                  const record = slot ? recordsBySlot.get(String(slot.time_slot_id)) : undefined;
-                  const state = slotState(config.mode, record);
-                  return (
-                    <td key={day}>
-                      {slot && (
-                        <button
-                          className={state.className}
-                          disabled={disabled || !selectedEntity}
-                          onClick={() => toggleSlot(slot)}
-                          type="button"
-                        >
-                          {state.label}
-                        </button>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
+      <ConstraintSlotGrid
+        config={config}
+        disabled={disabled}
+        onToggleSlot={toggleSlot}
+        selectedEntity={selectedEntity}
+        selectedEntityId={selectedEntityId}
+        slots={catalog.timeSlots}
+      />
     </div>
   );
-}
-
-function constraintConfig(key: ConstraintKey, catalog: Catalog): ConstraintViewConfig {
-  if (key === "groupUnavailability") {
-    return {
-      title: "Недоступность групп",
-      entityLabel: "Группа",
-      entityIdKey: "group_id",
-      entityNameKey: "name",
-      resource: "groupUnavailability",
-      recordIdKey: "unavailable_id",
-      mode: "unavailability",
-      entities: catalog.groups,
-      records: catalog.groupUnavailability,
-    };
-  }
-
-  if (key === "classroomUnavailability") {
-    return {
-      title: "Недоступность аудиторий",
-      entityLabel: "Аудитория",
-      entityIdKey: "classroom_id",
-      entityNameKey: "name",
-      resource: "classroomUnavailability",
-      recordIdKey: "unavailable_id",
-      mode: "unavailability",
-      entities: catalog.classrooms,
-      records: catalog.classroomUnavailability,
-    };
-  }
-
-  if (key === "teacherPreferences") {
-    return {
-      title: "Предпочтения преподавателей",
-      entityLabel: "Преподаватель",
-      entityIdKey: "teacher_id",
-      entityNameKey: "full_name",
-      resource: "teacherPreferences",
-      recordIdKey: "preference_id",
-      mode: "preference",
-      entities: catalog.teachers,
-      records: catalog.teacherPreferences,
-    };
-  }
-
-  return {
-    title: "Недоступность преподавателей",
-    entityLabel: "Преподаватель",
-    entityIdKey: "teacher_id",
-    entityNameKey: "full_name",
-    resource: "teacherUnavailability",
-    recordIdKey: "unavailable_id",
-    mode: "unavailability",
-    entities: catalog.teachers,
-    records: catalog.teacherUnavailability,
-  };
-}
-
-function groupSlotsByDay(slots: TimeSlot[]) {
-  return slots.reduce<Record<number, TimeSlot[]>>((groups, slot) => {
-    groups[slot.day_of_week] = [...(groups[slot.day_of_week] ?? []), slot].sort((left, right) => left.pair_number - right.pair_number);
-    return groups;
-  }, {});
-}
-
-function uniquePairNumbers(slots: TimeSlot[]) {
-  return [...new Set(slots.map((slot) => slot.pair_number))].sort((left, right) => left - right);
-}
-
-function mapRecordsBySlot(records: RowData[], entityIdKey: string, selectedEntityId: string) {
-  return new Map(
-    records
-      .filter((record) => String(record[entityIdKey]) === selectedEntityId)
-      .map((record) => [String(record.time_slot_id), record]),
-  );
-}
-
-function slotState(mode: ConstraintMode, record?: RowData) {
-  if (!record) return { className: "slot-state", label: "" };
-  if (mode === "unavailability") return { className: "slot-state blocked", label: "Н" };
-  if (record.preference === "preferred") return { className: "slot-state preferred", label: "+" };
-  return { className: "slot-state undesired", label: "-" };
 }
