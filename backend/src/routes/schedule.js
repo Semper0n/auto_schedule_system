@@ -88,7 +88,18 @@ function registerScheduleRoutes(app) {
 
         const [assignments, slots, classrooms, teacherBlocked, groupBlocked, classroomBlocked, preferences] =
           await Promise.all([
-            pool.query("SELECT * FROM teaching_assignments WHERE semester_id = $1 AND user_id = $2 ORDER BY assignment_id", [
+            pool.query(`
+              SELECT ta.*,
+                     COALESCE(array_agg(g.group_id ORDER BY g.name) FILTER (WHERE g.group_id IS NOT NULL), ARRAY[ta.group_id]) AS group_ids,
+                     COALESCE(SUM(g.students_count), fallback_group.students_count, 0)::int AS students_count
+              FROM teaching_assignments ta
+              LEFT JOIN teaching_assignment_groups tag ON tag.assignment_id = ta.assignment_id
+              LEFT JOIN student_groups g ON g.group_id = tag.group_id
+              LEFT JOIN student_groups fallback_group ON fallback_group.group_id = ta.group_id
+              WHERE ta.semester_id = $1 AND ta.user_id = $2
+              GROUP BY ta.assignment_id, fallback_group.students_count
+              ORDER BY ta.assignment_id
+            `, [
               semesterId,
               userId,
             ]),
@@ -126,18 +137,19 @@ function registerScheduleRoutes(app) {
         const skipped = [];
 
         for (const assignment of assignments.rows) {
+          const groupIds = assignment.group_ids?.length ? assignment.group_ids : [assignment.group_id];
           const lessonsCount = Math.max(1, Math.ceil(assignment.hours_per_week / 2));
           for (let lessonIndex = 0; lessonIndex < lessonsCount; lessonIndex += 1) {
             let best = null;
 
             for (const slot of slots.rows) {
               if (unavailable.teacher.has(`${assignment.teacher_id}:${slot.time_slot_id}`)) continue;
-              if (unavailable.group.has(`${assignment.group_id}:${slot.time_slot_id}`)) continue;
+              if (groupIds.some((groupId) => unavailable.group.has(`${groupId}:${slot.time_slot_id}`))) continue;
               if (busy.teacher.has(`${assignment.teacher_id}:${slot.time_slot_id}`)) continue;
-              if (busy.group.has(`${assignment.group_id}:${slot.time_slot_id}`)) continue;
+              if (groupIds.some((groupId) => busy.group.has(`${groupId}:${slot.time_slot_id}`))) continue;
 
               for (const classroom of classrooms.rows) {
-                if (classroom.capacity < assignment.classroom_capacity_required) continue;
+                if (classroom.capacity < Math.max(assignment.classroom_capacity_required, assignment.students_count)) continue;
                 if (unavailable.classroom.has(`${classroom.classroom_id}:${slot.time_slot_id}`)) continue;
                 if (busy.classroom.has(`${classroom.classroom_id}:${slot.time_slot_id}`)) continue;
 
@@ -163,7 +175,9 @@ function registerScheduleRoutes(app) {
             }
 
             busy.teacher.add(`${assignment.teacher_id}:${best.slot.time_slot_id}`);
-            busy.group.add(`${assignment.group_id}:${best.slot.time_slot_id}`);
+            for (const groupId of groupIds) {
+              busy.group.add(`${groupId}:${best.slot.time_slot_id}`);
+            }
             busy.classroom.add(`${best.classroom.classroom_id}:${best.slot.time_slot_id}`);
             generated.push({
               assignment_id: assignment.assignment_id,

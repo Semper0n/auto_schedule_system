@@ -6,7 +6,10 @@ async function getScheduleEntries(versionId, userId) {
       SELECT se.entry_id, se.version_id, se.assignment_id, se.time_slot_id, se.classroom_id,
              ts.day_of_week, ts.pair_number, ts.starts_at, ts.ends_at,
              t.teacher_id, t.full_name AS teacher_name,
-             g.group_id, g.name AS group_name, g.students_count,
+             ta.group_id,
+             COALESCE(array_agg(g.group_id ORDER BY g.name) FILTER (WHERE g.group_id IS NOT NULL), ARRAY[ta.group_id]) AS group_ids,
+             COALESCE(string_agg(g.name, ', ' ORDER BY g.name), fallback_group.name) AS group_name,
+             COALESCE(SUM(g.students_count), fallback_group.students_count, 0)::int AS students_count,
              s.name AS subject_name, lt.name AS lesson_type_name,
              c.name AS classroom_name, c.capacity,
              b.name AS building_name
@@ -16,11 +19,15 @@ async function getScheduleEntries(versionId, userId) {
       LEFT JOIN buildings b ON b.building_id = c.building_id
       JOIN teaching_assignments ta ON ta.assignment_id = se.assignment_id
       JOIN teachers t ON t.teacher_id = ta.teacher_id
-      JOIN student_groups g ON g.group_id = ta.group_id
+      LEFT JOIN teaching_assignment_groups tag ON tag.assignment_id = ta.assignment_id
+      LEFT JOIN student_groups g ON g.group_id = tag.group_id
+      LEFT JOIN student_groups fallback_group ON fallback_group.group_id = ta.group_id
       JOIN subjects s ON s.subject_id = ta.subject_id
       JOIN lesson_types lt ON lt.lesson_type_id = ta.lesson_type_id
       WHERE se.version_id = $1 AND ta.user_id = $2
-      ORDER BY ts.day_of_week, ts.pair_number, g.name
+      GROUP BY se.entry_id, ts.time_slot_id, t.teacher_id, ta.assignment_id, fallback_group.name, fallback_group.students_count,
+               s.name, lt.name, c.classroom_id, b.name
+      ORDER BY ts.day_of_week, ts.pair_number, group_name
     `,
     [versionId, userId],
   );
@@ -38,7 +45,6 @@ function calculateMetrics(entries, preferences = []) {
   for (const entry of entries) {
     for (const [type, id] of [
       ["teachers", entry.teacher_id],
-      ["groups", entry.group_id],
       ["classrooms", entry.classroom_id],
     ]) {
       const key = `${id}:${entry.time_slot_id}`;
@@ -50,6 +56,18 @@ function calculateMetrics(entries, preferences = []) {
         });
       }
       used[type].set(key, entry.entry_id);
+    }
+    const groupIds = entry.group_ids?.length ? entry.group_ids : [entry.group_id];
+    for (const groupId of groupIds) {
+      const key = `${groupId}:${entry.time_slot_id}`;
+      if (used.groups.has(key)) {
+        conflicts.push({
+          type: "groups",
+          time_slot_id: entry.time_slot_id,
+          entries: [used.groups.get(key), entry.entry_id],
+        });
+      }
+      used.groups.set(key, entry.entry_id);
     }
 
     if (entry.capacity < entry.students_count) {
@@ -63,8 +81,8 @@ function calculateMetrics(entries, preferences = []) {
 
   const gapsByResource = new Map();
   for (const entry of entries) {
-    for (const prefix of ["teacher", "group"]) {
-      const id = prefix === "teacher" ? entry.teacher_id : entry.group_id;
+    const gapResources = [["teacher", entry.teacher_id], ...(entry.group_ids?.length ? entry.group_ids : [entry.group_id]).map((groupId) => ["group", groupId])];
+    for (const [prefix, id] of gapResources) {
       const key = `${prefix}:${id}:${entry.day_of_week}`;
       if (!gapsByResource.has(key)) gapsByResource.set(key, []);
       gapsByResource.get(key).push(entry.pair_number);

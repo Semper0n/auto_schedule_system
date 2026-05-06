@@ -1,5 +1,5 @@
 export type Id = number | string | boolean;
-export type RowValue = Id | null;
+export type RowValue = Id | Id[] | null;
 export type RowData = Record<string, RowValue>;
 
 export type AuthUser = {
@@ -71,6 +71,7 @@ export type Assignment = RowData & {
   teacher_id: number;
   subject_id: number;
   group_id: number;
+  group_ids: number[];
   lesson_type_id: number;
   hours_per_week: number;
   classroom_capacity_required: number;
@@ -136,6 +137,7 @@ export type ScheduleEntry = {
   starts_at: string;
   ends_at: string;
   teacher_name: string;
+  group_ids: number[];
   group_name: string;
   subject_name: string;
   lesson_type_name: string;
@@ -146,7 +148,7 @@ export type ScheduleEntry = {
 export type FieldConfig = {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "time" | "select" | "checkbox";
+  type?: "text" | "number" | "date" | "time" | "select" | "multiselect" | "checkbox";
   defaultValue?: RowValue;
   options?: Record<string, unknown>[];
   valueKey?: string;

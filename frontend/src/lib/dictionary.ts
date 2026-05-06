@@ -197,12 +197,32 @@ export function selectField<T extends object>(
   };
 }
 
+export function multiSelectField<T extends object>(
+  name: string,
+  label: string,
+  options: T[],
+  valueKey: keyof T,
+  labelKey: keyof T,
+  required = true,
+): FieldConfig {
+  return {
+    name,
+    label,
+    type: "multiselect",
+    options: options as Record<string, unknown>[],
+    valueKey: String(valueKey),
+    labelKey: String(labelKey),
+    defaultValue: options[0] ? [String(options[0][valueKey])] : [],
+    required,
+  };
+}
+
 export function assignmentFields(catalog: Catalog): FieldConfig[] {
   return [
     selectField("semester_id", "Семестр", catalog.semesters, "semester_id", "name"),
     selectField("teacher_id", "Преподаватель", catalog.teachers, "teacher_id", "full_name"),
     selectField("subject_id", "Дисциплина", catalog.subjects, "subject_id", "name"),
-    selectField("group_id", "Группа", catalog.groups, "group_id", "name"),
+    multiSelectField("group_ids", "\u0413\u0440\u0443\u043f\u043f\u044b", catalog.groups, "group_id", "name"),
     selectField("lesson_type_id", "Тип занятия", catalog.lessonTypes, "lesson_type_id", "name"),
     field("hours_per_week", "Часов в неделю", "number", 2),
     field("classroom_capacity_required", "Мин. вместимость", "number", 20),
@@ -227,16 +247,17 @@ export function fieldsToBody(row: RowData, fields: FieldConfig[]) {
 }
 
 export function rowTitle(row: RowData, fields: FieldConfig[]) {
-  const preferred = fields.find((item) => ["name", "full_name", "subject_id", "group_id"].includes(item.name)) ?? fields[0];
+  const preferred = fields.find((item) => ["name", "full_name", "subject_id", "group_id", "group_ids"].includes(item.name)) ?? fields[0];
   return formatValue(row[preferred.name], preferred);
 }
 
 export function rowSubtitle(row: RowData, fields: FieldConfig[]) {
+  const titleField = fields.find((item) => ["name", "full_name", "subject_id", "group_id", "group_ids"].includes(item.name)) ?? fields[0];
   return fields
-    .filter((item) => item.name !== "name" && item.name !== "full_name")
+    .filter((item) => item.name !== "name" && item.name !== "full_name" && item.name !== titleField.name)
     .slice(0, 3)
     .map((item) => formatValue(row[item.name], item))
-    .filter((value) => value !== "—")
+    .filter((value) => value !== "-")
     .join(" · ");
 }
 
@@ -255,12 +276,20 @@ export function normalizeInputValue(value: RowValue, type?: FieldConfig["type"])
 }
 
 export function formatValue(value: RowValue, item: FieldConfig) {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return "-";
+  if (item.type === "multiselect") {
+    const selectedValues = Array.isArray(value) ? value : String(value).split(",").filter(Boolean);
+    const labels = selectedValues.map((selectedValue) => {
+      const option = item.options?.find((entry) => String(entry[item.valueKey ?? "value"]) === String(selectedValue));
+      return option ? String(option[item.labelKey ?? "label"]) : String(selectedValue);
+    });
+    return labels.join(", ");
+  }
   if (item.type === "select") {
     const option = item.options?.find((entry) => String(entry[item.valueKey ?? "value"]) === String(value));
     if (option) return String(option[item.labelKey ?? "label"]);
   }
-  if (item.type === "checkbox") return value ? "Да" : "Нет";
+  if (item.type === "checkbox") return value ? "\u0414\u0430" : "\u041d\u0435\u0442";
   if (item.type === "date") return String(value).slice(0, 10);
   if (item.type === "time") return String(value).slice(0, 5);
   return String(value);

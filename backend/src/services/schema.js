@@ -27,6 +27,21 @@ async function ensureOwnershipSchema() {
   await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_classrooms_user_building_name ON classrooms(user_id, building_id, name)");
   await pool.query("ALTER TABLE time_slots DROP CONSTRAINT IF EXISTS time_slots_day_of_week_pair_number_key");
   await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_time_slots_user_day_pair ON time_slots(user_id, day_of_week, pair_number)");
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS teaching_assignment_groups (
+      assignment_id INTEGER NOT NULL REFERENCES teaching_assignments(assignment_id) ON DELETE CASCADE,
+      group_id INTEGER NOT NULL REFERENCES student_groups(group_id) ON DELETE CASCADE,
+      PRIMARY KEY (assignment_id, group_id)
+    )
+  `);
+  await pool.query(`
+    INSERT INTO teaching_assignment_groups (assignment_id, group_id)
+    SELECT assignment_id, group_id
+    FROM teaching_assignments
+    WHERE group_id IS NOT NULL
+    ON CONFLICT DO NOTHING
+  `);
 }
 
 module.exports = { ensureOwnershipSchema };

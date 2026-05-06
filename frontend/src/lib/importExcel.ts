@@ -32,17 +32,19 @@ function normalizeImportValue(value: unknown, fieldConfig: FieldConfig): RowValu
     return undefined;
   }
 
+  if (fieldConfig.type === "multiselect") {
+    return text
+      .split(/[,;]+/)
+      .map((item) => normalizeSelectValue(item, fieldConfig))
+      .filter((item): item is string => Boolean(item));
+  }
+
   if (fieldConfig.type === "select") {
-    const option = fieldConfig.options?.find((item) => {
-      const optionValue = String(item[fieldConfig.valueKey ?? "value"]).trim();
-      const optionLabel = String(item[fieldConfig.labelKey ?? "label"]).trim();
-      return optionValue === text || optionLabel.toLowerCase() === text.toLowerCase();
-    });
-    return option ? String(option[fieldConfig.valueKey ?? "value"]) : text;
+    return normalizeSelectValue(text, fieldConfig);
   }
 
   if (fieldConfig.type === "checkbox") {
-    return ["1", "true", "yes", "да", "истина", "активный"].includes(text.toLowerCase());
+    return ["1", "true", "yes", "??", "??????", "????????"].includes(text.toLowerCase());
   }
 
   if (fieldConfig.type === "date") {
@@ -61,6 +63,16 @@ function normalizeImportValue(value: unknown, fieldConfig: FieldConfig): RowValu
   return text;
 }
 
+function normalizeSelectValue(value: string, fieldConfig: FieldConfig) {
+  const text = value.trim();
+  if (text === "") return "";
+  const option = fieldConfig.options?.find((item) => {
+    const optionValue = String(item[fieldConfig.valueKey ?? "value"]).trim();
+    const optionLabel = String(item[fieldConfig.labelKey ?? "label"]).trim();
+    return optionValue === text || optionLabel.toLowerCase() === text.toLowerCase();
+  });
+  return option ? String(option[fieldConfig.valueKey ?? "value"]) : text;
+}
 function hasImportValues(row: RowData) {
-  return Object.values(row).some((value) => value !== "" && value !== null && value !== false);
+  return Object.values(row).some((value) => Array.isArray(value) ? value.length > 0 : value !== "" && value !== null && value !== false);
 }

@@ -10,6 +10,27 @@ type FieldInputProps = {
 };
 
 export function FieldInput({ field, value, isDefault = false, onChange }: FieldInputProps) {
+  if (field.type === "multiselect") {
+    const selectedValues = Array.isArray(value) ? value.map(String) : String(value ?? "").split(",").filter(Boolean);
+    const props = isDefault
+      ? { defaultValue: selectedValues }
+      : {
+          value: selectedValues,
+          onChange: (event: ChangeEvent<HTMLSelectElement>) => {
+            onChange?.(Array.from(event.target.selectedOptions, (option) => option.value));
+          },
+        };
+    return (
+      <select className="multi-select" multiple name={field.name} required={field.required !== false} {...props}>
+        {(field.options ?? []).map((option) => (
+          <option key={String(option[field.valueKey ?? "value"])} value={String(option[field.valueKey ?? "value"])}>
+            {String(option[field.labelKey ?? "label"])}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   if (field.type === "select") {
     const props = isDefault
       ? { defaultValue: String(value ?? "") }

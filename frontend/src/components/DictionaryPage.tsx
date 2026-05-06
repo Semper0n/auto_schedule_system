@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { FieldInput } from "./FieldInput";
 import {
   createDraft,
@@ -16,7 +16,7 @@ export type ResourceHandlers = {
   onCreate: (resource: string, body: RowData) => void;
   onImport: (resource: string, rows: RowData[]) => Promise<void>;
   onUpdate: (resource: string, id: number, body: RowData) => void;
-  onDelete: (resource: string, id: number) => void;
+  onDelete: (resource: string, ids: number[]) => void;
 };
 
 type DictionaryPageProps = ResourceHandlers & {
@@ -26,28 +26,54 @@ type DictionaryPageProps = ResourceHandlers & {
 
 export function DictionaryPage({ config, disabled, onCreate, onImport, onUpdate, onDelete }: DictionaryPageProps) {
   const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [lastSelectedId, setLastSelectedId] = useState<number | null>(null);
   const [mode, setMode] = useState<"view" | "create" | "edit">("view");
   const [draft, setDraft] = useState<RowData>(() => emptyBody(config.fields));
   const [isImporting, setIsImporting] = useState(false);
 
-  const selectedRow = config.rows.find((row) => Number(row[config.idKey]) === selectedId);
+  const selectedRow = selectedIds.length === 1 ? config.rows.find((row) => Number(row[config.idKey]) === selectedIds[0]) : undefined;
   const isEditing = mode === "create" || mode === "edit";
-  const canUseSelected = selectedId !== null && Boolean(selectedRow) && !disabled;
+  const canUseSelected = selectedIds.length > 0 && !disabled;
+  const canEditSelected = selectedIds.length === 1 && Boolean(selectedRow) && !disabled;
 
   useEffect(() => {
-    setSelectedId(null);
+    setSelectedIds([]);
+    setLastSelectedId(null);
     setMode("view");
     setDraft(emptyBody(config.fields));
   }, [config.key, config.fields]);
 
-  function selectRow(row: RowData) {
+  function selectRow(row: RowData, event: MouseEvent<HTMLElement>) {
     if (isEditing) return;
-    setSelectedId(Number(row[config.idKey]));
+    const id = Number(row[config.idKey]);
+
+    if (event.shiftKey && lastSelectedId !== null) {
+      const ids = config.rows.map((item) => Number(item[config.idKey]));
+      const startIndex = ids.indexOf(lastSelectedId);
+      const endIndex = ids.indexOf(id);
+      if (startIndex !== -1 && endIndex !== -1) {
+        const [from, to] = startIndex < endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+        setSelectedIds(ids.slice(from, to + 1));
+        return;
+      }
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      setSelectedIds((current) => (
+        current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+      ));
+      setLastSelectedId(id);
+      return;
+    }
+
+    setSelectedIds([id]);
+    setLastSelectedId(id);
   }
 
   function startCreate() {
-    setSelectedId(null);
+    setSelectedIds([]);
+    setLastSelectedId(null);
     setMode("create");
     setDraft(createDraft(config));
   }
@@ -70,15 +96,17 @@ export function DictionaryPage({ config, disabled, onCreate, onImport, onUpdate,
       return;
     }
 
-    if (mode === "edit" && selectedId !== null) {
-      onUpdate(config.resource, selectedId, draft);
+    if (mode === "edit" && selectedIds.length === 1) {
+      onUpdate(config.resource, selectedIds[0], draft);
       cancel();
     }
   }
 
   function remove() {
-    if (selectedId !== null) {
-      onDelete(config.resource, selectedId);
+    if (selectedIds.length > 0) {
+      onDelete(config.resource, selectedIds);
+      setSelectedIds([]);
+      setLastSelectedId(null);
     }
   }
 
@@ -129,11 +157,11 @@ export function DictionaryPage({ config, disabled, onCreate, onImport, onUpdate,
           <button className="primary" disabled={disabled || isEditing} onClick={startCreate} type="button">
             Добавить
           </button>
-          <button disabled={!canUseSelected || isEditing} onClick={startEdit} type="button">
+          <button disabled={!canEditSelected || isEditing} onClick={startEdit} type="button">
             Изменить
           </button>
           <button className="danger" disabled={!canUseSelected || isEditing} onClick={remove} type="button">
-            Удалить
+            {selectedIds.length > 1 ? `Удалить (${selectedIds.length})` : "Удалить"}
           </button>
           <button className="primary" disabled={disabled || !isEditing} onClick={save} type="button">
             Сохранить
@@ -158,9 +186,9 @@ export function DictionaryPage({ config, disabled, onCreate, onImport, onUpdate,
                   <tbody>
                     {config.rows.map((row) => {
                       const id = Number(row[config.idKey]);
-                      const isSelected = selectedId === id;
+                      const isSelected = selectedIds.includes(id);
                       return (
-                        <tr className={isSelected ? "selected" : ""} key={id} onClick={() => selectRow(row)}>
+                        <tr className={isSelected ? "selected" : ""} key={id} onClick={(event) => selectRow(row, event)}>
                           {config.fields.map((item) => (
                             <td key={item.name}>{formatValue(row[item.name], item)}</td>
                           ))}
@@ -180,13 +208,13 @@ export function DictionaryPage({ config, disabled, onCreate, onImport, onUpdate,
             <div className="directory-list" role="listbox">
               {config.rows.map((row) => {
                 const id = Number(row[config.idKey]);
-                const isSelected = selectedId === id;
+                const isSelected = selectedIds.includes(id);
                 return (
                   <button
                     className={isSelected ? "selected" : ""}
                     disabled={isEditing}
                     key={id}
-                    onClick={() => selectRow(row)}
+                    onClick={(event) => selectRow(row, event)}
                     type="button"
                   >
                     <strong>{rowTitle(row, config.fields)}</strong>

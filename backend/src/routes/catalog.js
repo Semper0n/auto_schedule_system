@@ -56,14 +56,19 @@ function registerCatalogRoutes(app) {
         pool.query("SELECT * FROM time_slots WHERE user_id = $1 ORDER BY day_of_week, pair_number", [userId]),
         pool.query(`
           SELECT ta.*, t.full_name AS teacher_name, s.name AS subject_name,
-                 g.name AS group_name, lt.name AS lesson_type_name
+                 COALESCE(array_agg(g.group_id ORDER BY g.name) FILTER (WHERE g.group_id IS NOT NULL), ARRAY[ta.group_id]) AS group_ids,
+                 COALESCE(string_agg(g.name, ', ' ORDER BY g.name), fallback_group.name) AS group_name,
+                 lt.name AS lesson_type_name
           FROM teaching_assignments ta
           JOIN teachers t ON t.teacher_id = ta.teacher_id
           JOIN subjects s ON s.subject_id = ta.subject_id
-          JOIN student_groups g ON g.group_id = ta.group_id
+          LEFT JOIN teaching_assignment_groups tag ON tag.assignment_id = ta.assignment_id
+          LEFT JOIN student_groups g ON g.group_id = tag.group_id
+          LEFT JOIN student_groups fallback_group ON fallback_group.group_id = ta.group_id
           JOIN lesson_types lt ON lt.lesson_type_id = ta.lesson_type_id
           WHERE ta.user_id = $1
-          ORDER BY g.name, s.name
+          GROUP BY ta.assignment_id, t.full_name, s.name, fallback_group.name, lt.name
+          ORDER BY group_name, s.name
         `, [userId]),
         pool.query(`
           SELECT tu.*, t.full_name AS teacher_name, ts.day_of_week, ts.pair_number

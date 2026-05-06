@@ -231,15 +231,18 @@ function App() {
     }
   }
 
-  async function deleteResource(resource: string, id: number) {
-    const confirmed = window.confirm("Удалить запись? Если она используется в расписании или поручениях, система не позволит удалить её.");
+  async function deleteResource(resource: string, ids: number[]) {
+    const deleteLabel = ids.length > 1 ? `выбранные записи (${ids.length})` : "запись";
+    const confirmed = window.confirm(`Удалить ${deleteLabel}? Если они используются в расписании или поручениях, система не позволит удалить их.`);
     if (!confirmed) return;
 
     setIsBusy(true);
     try {
-      await request(`/${resource}/${id}`, { method: "DELETE" });
+      for (const id of ids) {
+        await request(`/${resource}/${id}`, { method: "DELETE" });
+      }
       await loadAll();
-      setMessage("Запись удалена");
+      setMessage(ids.length > 1 ? `Удалено записей: ${ids.length}` : "Запись удалена");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка удаления");
     } finally {

@@ -91,6 +91,12 @@ CREATE TABLE IF NOT EXISTS teaching_assignments (
     classroom_capacity_required INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS teaching_assignment_groups (
+    assignment_id INTEGER NOT NULL REFERENCES teaching_assignments(assignment_id) ON DELETE CASCADE,
+    group_id INTEGER NOT NULL REFERENCES student_groups(group_id) ON DELETE CASCADE,
+    PRIMARY KEY (assignment_id, group_id)
+);
+
 CREATE TABLE IF NOT EXISTS teacher_unavailability (
     unavailable_id SERIAL PRIMARY KEY,
     teacher_id INTEGER NOT NULL REFERENCES teachers(teacher_id) ON DELETE CASCADE,
@@ -262,6 +268,11 @@ WHERE NOT EXISTS (
       AND ta.group_id = g.group_id
       AND ta.lesson_type_id = lt.lesson_type_id
 );
+
+INSERT INTO teaching_assignment_groups (assignment_id, group_id)
+SELECT assignment_id, group_id
+FROM teaching_assignments
+ON CONFLICT DO NOTHING;
 
 INSERT INTO teacher_unavailability (teacher_id, time_slot_id, reason)
 SELECT t.teacher_id, ts.time_slot_id, 'Недоступность преподавателя'
