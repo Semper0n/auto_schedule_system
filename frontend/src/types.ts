@@ -132,6 +132,7 @@ export type ScheduleEntry = {
   entry_id: number;
   time_slot_id: number;
   classroom_id: number;
+  group_id: number;
   day_of_week: number;
   pair_number: number;
   starts_at: string;

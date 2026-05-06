@@ -91,7 +91,7 @@ function App() {
     setCatalog(catalogData);
     setVersions(versionData);
 
-    const versionId = nextVersionId ?? versionData[0]?.version_id ?? null;
+    const versionId = versionData.find((version) => version.version_id === nextVersionId)?.version_id ?? versionData[0]?.version_id ?? null;
     setSelectedVersionId(versionId);
     if (versionId) {
       const schedule = await request<{ entries: ScheduleEntry[] }>(`/schedule/versions/${versionId}`, undefined, token);
@@ -264,7 +264,7 @@ function App() {
           method: "POST",
           body: JSON.stringify({
             semester_id: activeSemester.semester_id,
-            name: `Автоматическое расписание ${new Date().toLocaleDateString("ru-RU")}`,
+            name: `Автоматическое расписание ${new Date().toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}`,
           }),
         },
       );
@@ -290,6 +290,38 @@ function App() {
       setMessage("Версия расписания сделана активной");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ошибка активации версии");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function renameVersion(versionId: number, name: string) {
+    setIsBusy(true);
+    try {
+      await request(`/schedule/versions/${versionId}`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      });
+      await loadAll(versionId);
+      setMessage("Название версии обновлено");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка обновления версии");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function deleteVersion(versionId: number) {
+    const confirmed = window.confirm("Удалить выбранную версию расписания?");
+    if (!confirmed) return;
+
+    setIsBusy(true);
+    try {
+      await request(`/schedule/versions/${versionId}`, { method: "DELETE" });
+      await loadAll(null);
+      setMessage("Версия расписания удалена");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ошибка удаления версии");
     } finally {
       setIsBusy(false);
     }
@@ -483,7 +515,6 @@ function App() {
             disabled={isBusy}
             onCreate={createResource}
             onDelete={deleteResource}
-            onImport={importResources}
             onUpdate={updateResource}
           />
         )}
@@ -505,6 +536,8 @@ function App() {
             onGenerate={generateSchedule}
             onValidate={validateVersion}
             onActivate={activateVersion}
+            onRenameVersion={renameVersion}
+            onDeleteVersion={deleteVersion}
             onUpdateEntry={updateEntry}
           />
         )}

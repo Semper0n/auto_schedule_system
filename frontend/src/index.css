@@ -626,6 +626,124 @@ td span {
   max-width: 360px;
 }
 
+.version-editor {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+}
+
+.constraint-grid-view {
+  height: calc(100vh - 56px);
+  min-height: 0;
+}
+
+.constraint-toolbar {
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.constraint-toolbar h2 {
+  margin: 4px 0 0;
+}
+
+.constraint-toolbar label {
+  min-width: min(420px, 100%);
+}
+
+.constraint-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+}
+
+.constraint-slot-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.constraint-slot-table th,
+.constraint-slot-table td {
+  border: 1px solid #cfd8e3;
+  padding: 0;
+  height: 52px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.constraint-slot-table thead th,
+.constraint-slot-table tbody th {
+  position: sticky;
+  background: #f8fafc;
+  z-index: 1;
+}
+
+.constraint-slot-table thead th {
+  top: 0;
+}
+
+.constraint-slot-table tbody th {
+  left: 0;
+  min-width: 150px;
+  width: 150px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.constraint-slot-table th strong,
+.constraint-slot-table th span {
+  display: block;
+}
+
+.constraint-slot-table th span {
+  color: #5a6778;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.slot-state {
+  width: 100%;
+  height: 100%;
+  min-width: 58px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.slot-state:hover {
+  box-shadow: inset 0 0 0 2px #176b87;
+}
+
+.slot-state.blocked {
+  background: #f8dddd;
+  border-color: #d88b8b;
+  color: #9b1c1c;
+}
+
+.slot-state.preferred {
+  background: #dff3e7;
+  border-color: #82bd98;
+  color: #176b3a;
+}
+
+.slot-state.undesired {
+  background: #fff0ce;
+  border-color: #ddb760;
+  color: #8a5a00;
+}
+
 .quality-row {
   padding: 14px;
 }
@@ -636,8 +754,144 @@ td span {
   padding: 8px 10px;
 }
 
+.schedule-view-toolbar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+}
+
+.schedule-view-toolbar label {
+  min-width: min(320px, 100%);
+}
+
+.segmented-control {
+  display: inline-flex;
+  border: 1px solid #c7d0dc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented-control button {
+  border: 0;
+  border-radius: 0;
+}
+
+.segmented-control button.active {
+  background: #176b87;
+  color: #ffffff;
+}
+
 .schedule-table {
   overflow: auto;
+}
+
+.group-schedule-wrap {
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+}
+
+.group-schedule-table {
+  min-width: 1180px;
+  table-layout: fixed;
+}
+
+.group-schedule-table th,
+.group-schedule-table td {
+  vertical-align: top;
+}
+
+.group-schedule-table td {
+  min-width: 0;
+  padding: 8px;
+}
+
+.group-schedule-table tbody th {
+  width: 110px;
+  background: #f8fafc;
+}
+
+.group-schedule-table tbody th strong,
+.group-schedule-table tbody th span {
+  display: block;
+}
+
+.group-schedule-table tbody th span {
+  color: #5a6778;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.group-schedule-card {
+  display: grid;
+  grid-template-rows: minmax(92px, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  min-height: 190px;
+  padding: 8px;
+  border: 1px solid #dce3ec;
+  border-radius: 6px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.group-schedule-card + .group-schedule-card {
+  margin-top: 8px;
+}
+
+.group-schedule-card-body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.group-schedule-card-body strong,
+.group-schedule-card-body span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.group-schedule-card-body strong {
+  display: -webkit-box;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.group-schedule-card-body span {
+  color: #5a6778;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.group-schedule-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.group-schedule-editor select,
+.group-schedule-editor button {
+  width: 100%;
+  min-width: 0;
+}
+
+.group-schedule-editor select {
+  font-size: 13px;
+  padding-inline: 6px;
 }
 
 .table-scroll {
@@ -742,5 +996,9 @@ th {
   .record-details div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .version-editor {
+    grid-template-columns: 1fr;
   }
 }

@@ -34,6 +34,40 @@ function registerScheduleRoutes(app) {
     }),
   );
 
+  app.put(
+    "/api/schedule/versions/:id",
+    asyncRoute(async (req, res) => {
+      const name = String(req.body.name ?? "").trim();
+      if (!name) {
+        return res.status(400).json({ error: "Название версии не может быть пустым" });
+      }
+      const result = await pool.query(
+        "UPDATE schedule_versions SET name = $1 WHERE version_id = $2 AND user_id = $3 RETURNING *",
+        [name, req.params.id, req.user.user_id],
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Версия расписания не найдена" });
+      }
+      await audit("update", "schedule_versions", req.params.id, { name });
+      return res.json(result.rows[0]);
+    }),
+  );
+
+  app.delete(
+    "/api/schedule/versions/:id",
+    asyncRoute(async (req, res) => {
+      const result = await pool.query(
+        "DELETE FROM schedule_versions WHERE version_id = $1 AND user_id = $2 RETURNING *",
+        [req.params.id, req.user.user_id],
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Версия расписания не найдена" });
+      }
+      await audit("delete", "schedule_versions", req.params.id, result.rows[0]);
+      return res.status(204).send();
+    }),
+  );
+
   app.post(
     "/api/schedule/versions/:id/activate",
     asyncRoute(async (req, res) => {
